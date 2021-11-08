@@ -37,14 +37,12 @@ def is_overridden(
         return False
 
     if parent is None:
-        if isinstance(instance, pl.LightningModule):
-            parent = pl.LightningModule
-        elif isinstance(instance, pl.LightningDataModule):
-            parent = pl.LightningDataModule
-        elif isinstance(instance, pl.Callback):
-            parent = pl.Callback
+        if isinstance(instance, (pl.LightningModule, pl.LightningDataModule, pl.Callback)):
+            parent = instance.__class__.__bases__
         if parent is None:
             raise ValueError("Expected a parent")
+
+    parent = (parent,) if not isinstance(parent, tuple) else parent
 
     instance_attr = getattr(instance, method_name, None)
     # `functools.wraps()` support
@@ -60,8 +58,10 @@ def is_overridden(
     if instance_attr is None:
         return False
 
-    parent_attr = getattr(parent, method_name, None)
-    if parent_attr is None:
+    parent_attrs = [getattr(p, method_name, None) for p in parent]
+    if all(parent_attr is None for parent_attr in parent_attrs):
         raise ValueError("The parent should define the method")
 
-    return instance_attr.__code__ != parent_attr.__code__
+    return any(
+        instance_attr.__code__ != parent_attr.__code__ for parent_attr in parent_attrs if parent_attr is not None
+    )

@@ -18,18 +18,25 @@ class RandomDataset(Dataset):
         return self.len
 
 
-class BoringModel(LightningModule):
+class ConfigureOptimizers:
+    def configure_optimizers(self):
+        return torch.optim.SGD(self.layer.parameters(), lr=0.1)
+
+
+class TrainingStep:
+    def training_step(self, batch, batch_idx):
+        loss = self(batch).sum()
+        self.log("train_loss", loss)
+        return {"loss": loss}
+
+
+class BoringModel(LightningModule, TrainingStep, ConfigureOptimizers):
     def __init__(self):
         super().__init__()
         self.layer = torch.nn.Linear(32, 2)
 
     def forward(self, x):
         return self.layer(x)
-
-    def training_step(self, batch, batch_idx):
-        loss = self(batch).sum()
-        self.log("train_loss", loss)
-        return {"loss": loss}
 
     def validation_step(self, batch, batch_idx):
         loss = self(batch).sum()
@@ -38,9 +45,6 @@ class BoringModel(LightningModule):
     def test_step(self, batch, batch_idx):
         loss = self(batch).sum()
         self.log("test_loss", loss)
-
-    def configure_optimizers(self):
-        return torch.optim.SGD(self.layer.parameters(), lr=0.1)
 
 
 def run():
