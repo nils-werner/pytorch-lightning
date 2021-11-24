@@ -335,6 +335,16 @@ class PyTorchProfiler(BaseProfiler):
         with_stack = profiler_kwargs.get("with_stack", False) or self._export_to_flame_graph
         self._profiler_kwargs["with_stack"] = with_stack
 
+        # the default schedule requires a minimum of 5 steps to properly work: `wait=1, warmup=1, active=3`.
+        # otherwise, this will raise a `segmentation fault`.
+        if self._should_override_schedule():
+            warning_cache.warn(
+                "The PyTorch Profiler default schedule will be overridden as there is not enough "
+                "steps to properly record traces."
+            )
+            self._schedule = None
+            self.profiler.schedule = torch.profiler.profiler._default_schedule_fn
+
     def _should_override_schedule(self) -> bool:
         return (self._lightning_module is not None and self._lightning_module.trainer.limit_train_batches < 5) and (
             self._schedule is not None and self._schedule._schedule == self._default_schedule()
@@ -409,17 +419,6 @@ class PyTorchProfiler(BaseProfiler):
         if self.profiler is not None and (
             action_name in self.STEP_FUNCTIONS or action_name.startswith(self.STEP_FUNCTION_PREFIX)
         ):
-
-            # the default schedule requires a minimum of 5 steps to properly work: `wait=1, warmup=1, active=3`.
-            # otherwise, this will raise a `segmentation fault`.
-            if self._should_override_schedule():
-                warning_cache.warn(
-                    "The PyTorch Profiler default schedule will be overridden as there is not enough "
-                    "steps to properly record traces."
-                )
-                self._schedule = None
-                self.profiler.schedule = torch.profiler.profiler._default_schedule_fn
-
             if self._schedule is not None:
                 self._schedule.pre_step(action_name)
 
